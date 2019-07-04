@@ -3,10 +3,52 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "25Azrez1KryD1B5YFjzSVNL/Ii0=",
+			"path": "github.com/DoubleChuang/gogrs/tradingdays",
+			"revision": "92edfd29079832a42c28cd7808a27a54d8a733da",
+			"revisionTime": "2019-07-03T14:57:01Z"
+		},
+		{
+			"checksumSHA1": "v4mrrQvoW5M/hVg7pIl2iGR1rmk=",
+			"path": "github.com/DoubleChuang/gogrs/twse",
+			"revision": "92edfd29079832a42c28cd7808a27a54d8a733da",
+			"revisionTime": "2019-07-03T14:57:01Z"
+		},
+		{
+			"checksumSHA1": "d64D/coX+q48fNmWUtLA16jDBVs=",
+			"path": "github.com/DoubleChuang/gogrs/utils",
+			"revision": "92edfd29079832a42c28cd7808a27a54d8a733da",
+			"revisionTime": "2019-07-03T14:57:01Z"
+		},
+		{
+			"checksumSHA1": "KAknS5tTtMGODtW1/CwgRvNJAqM=",
+			"path": "github.com/djimenez/iconv-go",
+			"revision": "8960e66bd3dacbc8773962b40eb82fc18c63c127",
+			"revisionTime": "2016-03-05T22:51:43Z"
+		},
+		{
 			"checksumSHA1": "TiaJgY48y1Do59np93drjPadKKU=",
 			"path": "github.com/line/line-bot-sdk-go/linebot",
 			"revision": "0a2ee140448a6c98e3972826b7681e5050013484",
 			"revisionTime": "2019-04-23T06:20:25Z"
+		},
+		{
+			"checksumSHA1": "I7hloldMJZTqUx6hbVDp5nk9fZQ=",
+			"path": "github.com/pkg/errors",
+			"revision": "27936f6d90f9c8e1145f11ed52ffffbfdb9e0af7",
+			"revisionTime": "2019-02-27T00:00:51Z"
+		},
+		{
+			"checksumSHA1": "QbScAhsJqL91Fok8ATXfaM6wOxU=",
+			"path": "github.com/toomore/gogrs/tradingdays",
+			"revision": "fc6ff9c5557023e614f432d423b3b39dcbe174ff",
+			"revisionTime": "2017-07-08T06:47:42Z"
+		},
+		{
+			"checksumSHA1": "By/XCMZILDxASVFxvn4X/gmFd1s=",
+			"path": "github.com/toomore/gogrs/utils",
+			"revision": "fc6ff9c5557023e614f432d423b3b39dcbe174ff",
+			"revisionTime": "2017-07-08T06:47:42Z"
 		},
 		{
 			"checksumSHA1": "9jjO5GjLa0XF/nfWihF02RoH4qc=",
@@ -21,5 +63,5 @@
 			"revisionTime": "2016-11-09T21:27:32Z"
 		}
 	],
-	"rootPath": "github.com/kkdai/LineBotTemplate"
+	"rootPath": "doubles/LineBotTemplate"
 }
