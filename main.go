@@ -321,12 +321,14 @@ func getTWSE(category string, minDataNum int) error {
 	if err != nil {
 		return errors.Wrap(err, "MTSS GetData Fail.")
 	}
+	tmpStock := make(map[string]twse.Data, len(tList))
 	for _, v := range tList {
 		//fmt.Printf("No:%s\n", v.No)
 		stock := twse.NewTWSE(v.No, RecentlyOpendtoday)
 		//checkFirstDayOfMonth(stock)
 		if err := prepareStock(stock, minDataNum); err == nil {
-			TWSEDataMap[RecentlyOpendtoday][v.No] = *stock
+
+			tmpStock[v.No] = *stock
 			var output bool = true
 
 			isT38OverBought, _ := getT38ByDate(v.No, 3)
@@ -397,11 +399,11 @@ func getTWSE(category string, minDataNum int) error {
 			fmt.Println(err)
 		}
 	}
+	TWSEDataMap[RecentlyOpendtoday] = tmpStock
 	return nil
 
 }
 func callbackHandler(w http.ResponseWriter, r *http.Request) {
-	utils.Dbgln("callbackHandler")
 	events, err := bot.ParseRequest(r)
 
 	if err != nil {
@@ -413,24 +415,48 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.Dbgln("ParseRequest")
 	for _, event := range events {
 		if event.Type == linebot.EventTypeMessage {
 
-			utils.Dbgln("EventTypeMessage")
 			switch message := event.Message.(type) {
 			case *linebot.TextMessage:
+				var replyMsg string = "股票列表\n=====\n"
+
 				quota, err := bot.GetMessageQuota().Do()
 				if err != nil {
 					log.Println("Quota err:", err)
+				} /*
+					if _, err = bot.ReplyMessage(event.ReplyToken,
+						linebot.NewTextMessage(message.ID+":"+
+							message.Text+
+							" OK! remain message:"+
+							strconv.FormatInt(quota.Value, 10))).Do(); err != nil {
+						log.Print(err)
+					}*/
+				if quota.Value != 500 {
+					replyMsg = fmt.Sprintf("剩餘訊息用量：%d\n%s", strconv.FormatInt(quota.Value, 10), replyMsg)
+				}
+				stockList := strings.Split(message.Text, " ")
+				RecentlyOpendtoday, _ := time.Parse(shortForm, *useDate)
+
+				for _, v := range stockList {
+					var (
+						stockData twse.Data
+						name      string
+					)
+					stockData, ok := TWSEDataMap[RecentlyOpendtoday][v]
+					if ok {
+						name = stockData.Name
+					} else {
+						name = "搜尋不到"
+					}
+					replyMsg = fmt.Sprintf("%s\n股票[%s]:%s", replyMsg, v, name)
 				}
 				if _, err = bot.ReplyMessage(event.ReplyToken,
-					linebot.NewTextMessage(message.ID+":"+
-						message.Text+
-						" OK! remain message:"+
-						strconv.FormatInt(quota.Value, 10))).Do(); err != nil {
+					linebot.NewTextMessage(replyMsg)).Do(); err != nil {
 					log.Print(err)
 				}
+
 			}
 		}
 	}
