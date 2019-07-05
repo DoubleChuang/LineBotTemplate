@@ -299,6 +299,7 @@ func getTWSE(category string, minDataNum int) error {
 
 	RecentlyOpendtoday, _ := time.Parse(shortForm, *useDate)
 	utils.Dbgln(RecentlyOpendtoday)
+	utils.Dbgln(utils.GetOSRamdiskPath(""))
 
 	//RecentlyOpendtoday := tradingdays.FindRecentlyOpened(time.Now())
 
