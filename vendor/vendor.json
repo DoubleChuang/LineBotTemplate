@@ -15,10 +15,10 @@
 			"revisionTime": "2019-07-03T14:57:01Z"
 		},
 		{
-			"checksumSHA1": "d64D/coX+q48fNmWUtLA16jDBVs=",
+			"checksumSHA1": "NKoC18VoM7jKO8l2rTyaRVaonFQ=",
 			"path": "github.com/DoubleChuang/gogrs/utils",
-			"revision": "92edfd29079832a42c28cd7808a27a54d8a733da",
-			"revisionTime": "2019-07-03T14:57:01Z"
+			"revision": "2c4f5789f97ae3a6a8a6f252d5eb69d544da1e76",
+			"revisionTime": "2019-07-05T15:03:50Z"
 		},
 		{
 			"checksumSHA1": "KAknS5tTtMGODtW1/CwgRvNJAqM=",
@@ -63,5 +63,5 @@
 			"revisionTime": "2016-11-09T21:27:32Z"
 		}
 	],
-	"rootPath": "doubles/LineBotTemplate"
+	"rootPath": "github.com/DoubleChuang/LineBotTemplate"
 }

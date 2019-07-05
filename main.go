@@ -144,8 +144,9 @@ type TXXData struct {
 }
 
 var (
-	T38DataMap map[time.Time]map[string]TXXData = make(map[time.Time]map[string]TXXData)
-	T44DataMap map[time.Time]map[string]TXXData = make(map[time.Time]map[string]TXXData)
+	T38DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
+	T44DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
+	TWSEDataMap map[time.Time]map[string]twse.Data = make(map[time.Time]map[string]twse.Data)
 )
 
 func getT38(date time.Time) (map[string]TXXData, error) {
@@ -296,10 +297,11 @@ func getT44ByDate(stockNo string, day int) (bool, []int64) {
 }
 
 func getTWSE(category string, minDataNum int) error {
-
+	if err := utils.RecoveryStockBackup(*useDate); err != nil {
+		utils.Dbgln(err)
+	}
 	RecentlyOpendtoday, _ := time.Parse(shortForm, *useDate)
 	utils.Dbgln(RecentlyOpendtoday)
-	utils.Dbgln(utils.GetOSRamdiskPath(""))
 
 	//RecentlyOpendtoday := tradingdays.FindRecentlyOpened(time.Now())
 
@@ -328,6 +330,7 @@ func getTWSE(category string, minDataNum int) error {
 		stock := twse.NewTWSE(v.No, RecentlyOpendtoday)
 		//checkFirstDayOfMonth(stock)
 		if err := prepareStock(stock, minDataNum); err == nil {
+			TWSEDataMap[RecentlyOpendtoday][v.No] = *stock
 			var output bool = true
 			utils.Dbgln()
 			isT38OverBought, _ := getT38ByDate(v.No, 3)
