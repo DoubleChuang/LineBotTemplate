@@ -44,6 +44,7 @@ var bot *linebot.Client
 func main() {
 	var err error
 	go getTWSE("ALLBUT0999", 3)
+	utils.Dbgln(utils.GetOSRamdiskPath(""))
 
 	//bot, err = linebot.New(ChannelSecret, ChannelAccessToken)
 	bot, err = linebot.New(os.Getenv("ChannelSecret"), os.Getenv("ChannelAccessToken"))
@@ -137,8 +138,9 @@ type TXXData struct {
 }
 
 var (
-	T38DataMap map[time.Time]map[string]TXXData = make(map[time.Time]map[string]TXXData)
-	T44DataMap map[time.Time]map[string]TXXData = make(map[time.Time]map[string]TXXData)
+	T38DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
+	T44DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
+	TWSEDataMap map[time.Time]map[string]twse.Data = make(map[time.Time]map[string]twse.Data)
 )
 
 func getT38(date time.Time) (map[string]TXXData, error) {
@@ -290,6 +292,10 @@ func getT44ByDate(stockNo string, day int) (bool, []int64) {
 
 func getTWSE(category string, minDataNum int) error {
 
+	if err := utils.RecoveryStockBackup(*useDate); err != nil {
+		utils.Dbgln(err)
+	}
+
 	RecentlyOpendtoday, _ := time.Parse(shortForm, *useDate)
 	utils.Dbgln(RecentlyOpendtoday)
 
@@ -310,7 +316,7 @@ func getTWSE(category string, minDataNum int) error {
 	//	if err != nil{
 	//		return err
 	//	}
-	utils.Dbgln()
+
 	mtssMapData, err := twse.NewTWMTSS(RecentlyOpendtoday, "ALL").GetData()
 	if err != nil {
 		return errors.Wrap(err, "MTSS GetData Fail.")
@@ -320,14 +326,14 @@ func getTWSE(category string, minDataNum int) error {
 		stock := twse.NewTWSE(v.No, RecentlyOpendtoday)
 		//checkFirstDayOfMonth(stock)
 		if err := prepareStock(stock, minDataNum); err == nil {
+			TWSEDataMap[RecentlyOpendtoday][v.No] = *stock
 			var output bool = true
-			utils.Dbgln()
+
 			isT38OverBought, _ := getT38ByDate(v.No, 3)
 			isT44OverBought, _ := getT44ByDate(v.No, 3)
 			isMTSSOverBought := mtssMapData[v.No].MT.Total > 0 && mtssMapData[v.No].SS.Total > 0
-			utils.Dbgln()
+
 			if res, err := showStock(stock, minDataNum); err == nil {
-				utils.Dbgln()
 				if *useCp {
 					if res.todayGain >= 3.5 {
 						output = true
