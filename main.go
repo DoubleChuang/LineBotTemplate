@@ -144,9 +144,9 @@ type TXXData struct {
 }
 
 var (
-	T38DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
-	T44DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
-	TWSEDataMap map[time.Time]map[string]twse.Data = make(map[time.Time]map[string]twse.Data)
+	T38DataMap map[time.Time]map[string]TXXData = make(map[time.Time]map[string]TXXData)
+	T44DataMap map[time.Time]map[string]TXXData = make(map[time.Time]map[string]TXXData)
+	//TWSEDataMap map[time.Time]map[string]twse.Data = make(map[time.Time]map[string]twse.Data)
 )
 
 func getT38(date time.Time) (map[string]TXXData, error) {
@@ -330,7 +330,7 @@ func getTWSE(category string, minDataNum int) error {
 		stock := twse.NewTWSE(v.No, RecentlyOpendtoday)
 		//checkFirstDayOfMonth(stock)
 		if err := prepareStock(stock, minDataNum); err == nil {
-			TWSEDataMap[RecentlyOpendtoday][v.No] = *stock
+			//TWSEDataMap[RecentlyOpendtoday][v.No] = *stock
 			var output bool = true
 			utils.Dbgln()
 			isT38OverBought, _ := getT38ByDate(v.No, 3)
