@@ -18,7 +18,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,19 +30,44 @@ import (
 
 const shortForm = "20060102"
 
+var replyHelp string = `
+DD [YYYYMMDD] [命令] [命令參數]
+ex.
+	DD 20190703 股票 2330
+`
 var defaultB bool = false
 var useMtss *bool = &defaultB
 var useT38 *bool = &defaultB
 var useT44 *bool = &defaultB
 var useMa *bool = &defaultB
 var useCp *bool = &defaultB
-var defaultDate string = "20190703"
+var defaultDate string = "20190705"
 var useDate *string = &defaultDate
 var bot *linebot.Client
 
+//ç²åå¤è³èé¸è³
+type TXXData struct {
+	Buy   int64
+	Sell  int64
+	Total int64
+}
+type resData struct {
+	todayRange float64
+	todayPrice float64
+	todayGain  float64
+	NDayAvg    float64
+	overMA     bool
+}
+
+var (
+	T38DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
+	T44DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
+	TWSEDataMap map[time.Time]map[string]twse.Data = make(map[time.Time]map[string]twse.Data)
+)
+
 func main() {
 	var err error
-	go getTWSE("ALLBUT0999", 3)
+	go getTWSE("ALLBUT0999", 20)
 	utils.Dbgln(utils.GetOSRamdiskPath(""))
 
 	//bot, err = linebot.New(ChannelSecret, ChannelAccessToken)
@@ -61,6 +85,58 @@ func main() {
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
+}
+func parserMsg(msg string) (reqTime time.Time, reqCmd string, remainList []string, err error) {
+	reqCmd = "股票"
+	remainList = make([]string, 0)
+
+	reqString := strings.TrimSpace(msg)
+	reqList := strings.Split(reqString, " ")
+
+	//用來計算跑到哪個
+	c := 0
+
+	for i := 0; i < len(reqList); i++ {
+		v := reqList[i]
+		//跳過空白
+		if len(v) == 0 {
+			continue
+		}
+		switch c {
+		case 0:
+			if v != "DD" {
+				err = errors.New("不是命令")
+				break
+			}
+			c++
+		case 1:
+			if reqTime, err = time.Parse(shortForm, v); err != nil {
+				reqTime = tradingdays.FindRecentlyOpened(time.Now())
+				err = nil
+
+				i--
+			}
+			c++
+		case 2:
+			if strings.Contains(v, "股票") ||
+				strings.Contains(v, "股票分析") {
+				reqCmd = v
+			} else {
+
+				err = errors.New("輸入格式錯誤")
+				break
+			}
+			c++
+		case 3:
+			remainList = append(remainList, v)
+		default:
+		}
+	}
+	utils.Dbgln(reqTime)
+	utils.Dbgln(reqCmd)
+	utils.Dbgln(remainList)
+	utils.Dbgln(err)
+	return reqTime, reqCmd, remainList, err
 }
 func prepareStock(stock *twse.Data, mindata int) error {
 
@@ -85,14 +161,6 @@ func prepareStock(stock *twse.Data, mindata int) error {
 		}
 	}
 	return nil
-}
-
-type resData struct {
-	todayRange float64
-	todayPrice float64
-	todayGain  float64
-	NDayAvg    float64
-	overMA     bool
 }
 
 func showStock(stock *twse.Data, minDataNum int) (*resData, error) {
@@ -129,19 +197,6 @@ func showStock(stock *twse.Data, minDataNum int) (*resData, error) {
 	return res, nil
 
 }
-
-//ç²åå¤è³èé¸è³
-type TXXData struct {
-	Buy   int64
-	Sell  int64
-	Total int64
-}
-
-var (
-	T38DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
-	T44DataMap  map[time.Time]map[string]TXXData   = make(map[time.Time]map[string]TXXData)
-	TWSEDataMap map[time.Time]map[string]twse.Data = make(map[time.Time]map[string]twse.Data)
-)
 
 func getT38(date time.Time) (map[string]TXXData, error) {
 	//RecentlyOpendtoday := tradingdays.FindRecentlyOpened(time.Now())
@@ -420,41 +475,89 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 
 			switch message := event.Message.(type) {
 			case *linebot.TextMessage:
-				var replyMsg string = "股票列表\n=====\n"
+				var replyMsg string = "股票列表\n=========\n"
 
 				quota, err := bot.GetMessageQuota().Do()
 				if err != nil {
 					log.Println("Quota err:", err)
-				} /*
-					if _, err = bot.ReplyMessage(event.ReplyToken,
-						linebot.NewTextMessage(message.ID+":"+
-							message.Text+
-							" OK! remain message:"+
-							strconv.FormatInt(quota.Value, 10))).Do(); err != nil {
-						log.Print(err)
-					}*/
+				}
 				if quota.Value != 500 {
-					replyMsg = fmt.Sprintf("剩餘訊息用量：%d\n%s", strconv.FormatInt(quota.Value, 10), replyMsg)
+					replyMsg = fmt.Sprintf("剩餘訊息用量：%d\n%s", quota.Value, replyMsg)
 				}
-				stockList := strings.Split(message.Text, " ")
-				RecentlyOpendtoday, _ := time.Parse(shortForm, *useDate)
 
-				for _, v := range stockList {
-					var (
-						stockData twse.Data
-						name      string
-					)
-					stockData, ok := TWSEDataMap[RecentlyOpendtoday][v]
-					if ok {
-						name = stockData.Name
+				if reqTime, reqCmd, remainList, err := parserMsg(message.Text); err == nil {
+
+					if dateDataMap, ok := TWSEDataMap[reqTime]; ok {
+						utils.Dbgln()
+						if reqCmd == "股票" {
+							utils.Dbgln()
+							for _, v := range remainList {
+								var name string
+								stockData, ok := dateDataMap[v]
+								if ok {
+									if res, err := showStock(&stockData, 20); err == nil {
+										name = fmt.Sprintf("漲跌: %.2f\n成交價: %.2f\n漲跌幅: %.2f%%\n20MA:%.2f\n突破MA:%t\n=========\n",
+											res.todayRange,
+											res.todayPrice,
+											res.todayGain,
+											res.NDayAvg,
+											res.overMA,
+										)
+									}
+
+								} else {
+									name = "搜尋不到"
+								}
+								replyMsg = fmt.Sprintf("%s\n股票[%s]:\n%s", replyMsg, v, name)
+							}
+						} else if reqCmd == "股票分析" {
+							utils.Dbgln()
+							for _, v := range dateDataMap {
+								if res, err := showStock(&v, 20); err == nil {
+									//mtssMapData, err := twse.NewTWMTSS(reqTime, "ALL").GetData()
+									if err != nil {
+										//return errors.Wrap(err, "MTSS GetData Fail.")
+									}
+									//isT38OverBought, _ := getT38ByDate(v.No, 3)
+									//isT44OverBought, _ := getT44ByDate(v.No, 3)
+									//isMTSSOverBought := mtssMapData[v.No].MT.Total > 0 && mtssMapData[v.No].SS.Total > 0
+									isGainOver3 := res.todayGain >= 3.5
+									isPriceOverMA := res.overMA
+									if /*isT38OverBought && isT44OverBought && isMTSSOverBought &&*/
+									isGainOver3 && isPriceOverMA {
+										replyMsg = fmt.Sprintf("%sNo: %6s\n漲跌: %.2f\n成交價: %.2f\n漲跌幅: %.2f%%\n20MA:%.2f\n突破MA:%t\n=========\n",
+											replyMsg,
+											v.No,
+											res.todayRange,
+											res.todayPrice,
+											res.todayGain,
+											res.NDayAvg,
+											res.overMA,
+										)
+									}
+								} else {
+									utils.Dbgln(err)
+								}
+							}
+
+						} else {
+							replyMsg = fmt.Sprintf("不支援此命令：%s\n%s\n", reqCmd, replyHelp)
+						}
 					} else {
-						name = "搜尋不到"
+						replyMsg = fmt.Sprintf("%s這個時間目前沒有資料", reqTime.Format("2006-01-02"))
 					}
-					replyMsg = fmt.Sprintf("%s\n股票[%s]:%s", replyMsg, v, name)
-				}
-				if _, err = bot.ReplyMessage(event.ReplyToken,
-					linebot.NewTextMessage(replyMsg)).Do(); err != nil {
-					log.Print(err)
+					if _, err = bot.ReplyMessage(event.ReplyToken,
+						linebot.NewTextMessage(replyMsg)).Do(); err != nil {
+						log.Print(err)
+					}
+				} else {
+					if !strings.Contains(err.Error(), "不是命令") {
+						replyMsg = fmt.Sprintf("%s\n%s", err.Error(), replyHelp)
+						if _, err = bot.ReplyMessage(event.ReplyToken,
+							linebot.NewTextMessage(replyMsg)).Do(); err != nil {
+							log.Print(err)
+						}
+					}
 				}
 
 			}
