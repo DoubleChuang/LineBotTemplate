@@ -29,7 +29,7 @@ import (
 
 const shortForm = "20060102"
 
-var replyHelp string = `
+var replyHelp = `
 DD [YYYYMMDD] [命令] [命令參數]
 ex.
 	DD 20190703 股票 2330
@@ -181,25 +181,25 @@ func parserMsg(msg string) (reqTime time.Time, reqCmd string, remainList []strin
 	utils.Dbgln(err)
 	return reqTime, reqCmd, remainList, err
 }
-func prepareStock(stock **twse.Data, mindata int) error {
+func prepareStock(stock *twse.Data, mindata int) error {
 
-	if _, err := (*stock).Get(); err != nil {
+	if _, err := (stock).Get(); err != nil {
 		return err
 	}
 
-	if (*stock).Len() < mindata {
-		start := (*stock).Len()
+	if (stock).Len() < mindata {
+		start := (stock).Len()
 		for {
-			(*stock).PlusData()
-			if (*stock).Len() > mindata {
+			(stock).PlusData()
+			if (stock).Len() > mindata {
 				break
 			}
-			if (*stock).Len() == start {
+			if (stock).Len() == start {
 				break
 			}
-			start = (*stock).Len()
+			start = (stock).Len()
 		}
-		if (*stock).Len() < mindata {
+		if (stock).Len() < mindata {
 			return errors.New("Can't prepare enough data, please check file has data or remove cache file")
 		}
 	}
@@ -241,11 +241,9 @@ func showStock(stock *twse.Data, minDataNum int) (*resData, error) {
 
 }
 
-func getOneTWSE(date time.Time, stockNo string, t38 **twse.TWT38U, t44 **twse.TWT44U, mtss **twse.TWMTSS) string {
+func getOneTWSE(date time.Time, stockNo string, t38 **twse.TWT38U, t44 **twse.TWT44U, mtss **twse.TWMTSS) (string, error) {
 	var ret string
-	//stock, ok := TWSEDataMap[date][stockNo]
-	//pStock := &stock
-	//if !ok {
+
 	t := twse.NewLists(date)
 	tList := t.GetCategoryList("ALLBUT0999")
 	found := false
@@ -258,44 +256,51 @@ func getOneTWSE(date time.Time, stockNo string, t38 **twse.TWT38U, t44 **twse.TW
 		}
 	}
 	if !found {
-		return fmt.Sprintf("%s沒有%s此股票", date.Format(shortForm), stockNo)
+		return fmt.Sprintf("%s沒有%s此股票", date.Format(shortForm), stockNo), errors.Errorf("%s沒有%s此股票", date.Format(shortForm), stockNo)
 	}
 	//}
-	utils.Dbgln(pStock.Date)
-	//twse.NewTWMTSS(date, "ALL")
+
 	mtssMapData, err := (*mtss).SetDate(date).GetData()
 	if err != nil {
-		return fmt.Sprintf("融資融券資料錯誤")
+		return fmt.Sprintf("融資融券資料錯誤"), errors.Errorf("融資融券資料錯誤")
 	}
-	if err := prepareStock(&pStock, 20); err == nil {
-		isT38OverBought, _ := (*t38).IsOverBoughtDates(stockNo, 3)
-		isT44OverBought, _ := (*t44).IsOverBoughtDates(stockNo, 3)
+	if err := prepareStock(pStock, 20); err == nil {
+		var d time.Time
+		for _, d = range pStock.GetDateList() {
+			if d == date {
+				break
+			}
+		}
+
+		isT38OverBought, x := (*t38).IsOverBoughtDates(stockNo, 3)
+		isT44OverBought, y := (*t44).IsOverBoughtDates(stockNo, 3)
 		if s, err := showStock(pStock, 20); err == nil {
-			ret = fmt.Sprintf("漲跌: %.2f\n成交價: %.2f\n漲跌幅: %.2f%%\n20MA:%.2f\n突破MA:%t\n外資增：%t\n投信增:%t\n融資增：%t\n融券增：%t\n=========\n",
-				s.todayRange,
-				s.todayPrice,
-				s.todayGain,
-				s.NDayAvg,
-				s.overMA,
-				isT38OverBought,
-				isT44OverBought,
-				mtssMapData[stockNo].MT.Total > 0,
-				mtssMapData[stockNo].SS.Total > 0,
+			ret = fmt.Sprintf(
+				"\n%4s：%6.2f\n"+
+					"%4s：%6.2f\n"+
+					"%4s：%6.2f%%\n"+
+					"%4s：%6.2f\n"+
+					"%4s：%t\n"+
+					"%4s：%t %d\n"+
+					"%4s：%t %d\n"+
+					"%4s：%t %d\n"+
+					"%4s：%t %d\n",
+				"漲跌價", s.todayRange,
+				"成交價", s.todayPrice,
+				"漲跌幅", s.todayGain,
+				"月均價", s.NDayAvg,
+				"破月均", s.overMA,
+				"外資增", isT38OverBought, x[0]/1000,
+				"投信增", isT44OverBought, y[0]/1000,
+				"融資增", mtssMapData[stockNo].MT.Total > 0, mtssMapData[stockNo].MT.Total,
+				"融券增", mtssMapData[stockNo].SS.Total > 0, mtssMapData[stockNo].SS.Total,
 			)
 		}
 	} else {
 		ret = fmt.Sprintf("資料錯誤")
 	}
 
-	if _, exist := TWSEDataMap[date]; exist {
-		TWSEDataMap[date][stockNo] = *pStock
-	} else {
-		twseData := make(map[string]twse.Data)
-		twseData[stockNo] = *pStock
-		TWSEDataMap[date] = twseData
-	}
-
-	return ret
+	return ret, nil
 
 }
 
@@ -322,7 +327,7 @@ func getTWSE(useDate string, minDataNum int, t38 *twse.TWT38U, t44 *twse.TWT44U,
 		//fmt.Printf("No:%s\n", v.No)
 		stock := twse.NewTWSE(v.No, RecentlyOpendtoday)
 		//checkFirstDayOfMonth(stock)
-		if err := prepareStock(&stock, minDataNum); err == nil {
+		if err := prepareStock(stock, minDataNum); err == nil {
 
 			tmpStock[v.No] = *stock
 			var output bool = true
@@ -397,7 +402,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 
 			switch message := event.Message.(type) {
 			case *linebot.TextMessage:
-				var replyMsg string = "股票列表\n=========\n"
+				var replyMsg = "股票列表\n=========\n"
 
 				quota, err := bot.GetMessageQuota().Do()
 				if err != nil {
@@ -406,79 +411,53 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 				if quota.Value != 500 {
 					replyMsg = fmt.Sprintf("剩餘訊息用量：%d\n%s", quota.Value, replyMsg)
 				}
-
-				if reqTime, reqCmd, remainList, err := parserMsg(message.Text); err == nil {
-					dateDataMap, _ := TWSEDataMap[reqTime]
-					//if ; ok {
-					utils.Dbgln()
+				var msgList []linebot.SendingMessage
+				if reqTime, reqCmd, remainList, err := parserMsg(message.Text); err == nil && len(remainList) != 0 {
 					if reqCmd == "股票" {
-						utils.Dbgln()
 						for _, v := range remainList {
-							/*var ret string
-							stockData, ok := dateDataMap[v]
-							if ok {
-								if res, err := showStock(&stockData, 20); err == nil {
-									ret = fmt.Sprintf("漲跌: %.2f\n成交價: %.2f\n漲跌幅: %.2f%%\n20MA:%.2f\n突破MA:%t\n=========\n",
-										res.todayRange,
-										res.todayPrice,
-										res.todayGain,
-										res.NDayAvg,
-										res.overMA,
-									)
-								}
-
-							} else {
-								name = "搜尋不到"
-							}*/
 							var ret string
-							ret = getOneTWSE(reqTime, v, &T38U, &T44U, &MTSS)
-							replyMsg = fmt.Sprintf("%s\n股票[%s]:\n%s", replyMsg, v, ret)
+							if ret, err = getOneTWSE(reqTime, v, &T38U, &T44U, &MTSS); err != nil {
+								replyMsg = fmt.Sprintf("股票[%s] 發生錯誤:\n%s", v, err.Error())
+							} else {
+								replyMsg = fmt.Sprintf("股票[%s]:\n%s", v, ret)
+							}
+							msg := linebot.NewTextMessage(replyMsg)
+							msgList = append(msgList, msg)
+
 						}
 					} else if reqCmd == "股票分析" {
-						utils.Dbgln()
-						for _, v := range dateDataMap {
-							if res, err := showStock(&v, 20); err == nil {
-								//mtssMapData, err := twse.NewTWMTSS(reqTime, "ALL").GetData()
-								if err != nil {
-									//return errors.Wrap(err, "MTSS GetData Fail.")
-								}
-								//isT38OverBought, _ := getT38ByDate(v.No, 3)
-								//isT44OverBought, _ := getT44ByDate(v.No, 3)
-								//isMTSSOverBought := mtssMapData[v.No].MT.Total > 0 && mtssMapData[v.No].SS.Total > 0
-								isGainOver3 := res.todayGain >= 3.5
-								isPriceOverMA := res.overMA
-								if /*isT38OverBought && isT44OverBought && isMTSSOverBought &&*/
-								isGainOver3 && isPriceOverMA {
-									replyMsg = fmt.Sprintf("%sNo: %6s\n漲跌: %.2f\n成交價: %.2f\n漲跌幅: %.2f%%\n20MA:%.2f\n突破MA:%t\n=========\n",
-										replyMsg,
-										v.No,
-										res.todayRange,
-										res.todayPrice,
-										res.todayGain,
-										res.NDayAvg,
-										res.overMA,
-									)
-								}
+						for _, v := range remainList {
+							var ret string
+							if ret, err = getOneTWSE(reqTime, v, &T38U, &T44U, &MTSS); err != nil {
+								replyMsg = fmt.Sprintf("股票[%s] 發生錯誤:\n%s", v, err.Error())
 							} else {
-								utils.Dbgln(err)
+								replyMsg = fmt.Sprintf("股票[%s]:\n%s", v, ret)
 							}
+							msg := linebot.NewTextMessage(replyMsg)
+							msgList = append(msgList, msg)
+
 						}
 
 					} else {
 						replyMsg = fmt.Sprintf("不支援此命令：%s\n%s\n", reqCmd, replyHelp)
+						msg := linebot.NewTextMessage(replyMsg)
+						msgList = append(msgList, msg)
 					}
-					/*} else {
-						replyMsg = fmt.Sprintf("%s這個時間目前沒有資料", reqTime.Format("2006-01-02"))
-					}*/
+
 					if _, err = bot.ReplyMessage(event.ReplyToken,
-						linebot.NewTextMessage(replyMsg)).Do(); err != nil {
+						msgList...).Do(); err != nil {
 						log.Print(err)
 					}
 				} else {
-					if !strings.Contains(err.Error(), "不是命令") {
+					if err != nil && !strings.Contains(err.Error(), "不是命令") {
 						replyMsg = fmt.Sprintf("%s\n%s", err.Error(), replyHelp)
 						if _, err = bot.ReplyMessage(event.ReplyToken,
 							linebot.NewTextMessage(replyMsg)).Do(); err != nil {
+							log.Print(err)
+						}
+					} else if err == nil {
+						if _, err = bot.ReplyMessage(event.ReplyToken,
+							linebot.NewTextMessage("你忘了輸入參數")).Do(); err != nil {
 							log.Print(err)
 						}
 					}
